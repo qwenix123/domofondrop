@@ -1,0 +1,6 @@
+README.md
+.gitignore
+*.txt
+*.md
+drafts/
+private/
