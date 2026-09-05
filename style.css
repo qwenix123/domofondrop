@@ -1,906 +1,1704 @@
-:root {
-  --bg-main: #0a0d12;
-  --bg-card: #121720;
-  --bg-card-hover: #171f2c;
-  --bg-slot: #0d121a;
-  --accent-lime: #00ff88;
-  --accent-lime-glow: rgba(0, 255, 136, 0.4);
-  --accent-cyan: #00e5ff;
-  --accent-purple: #c026d3;
-  --accent-gold: #f59e0b;
-  --text-white: #f8fafc;
-  --text-muted: #8492a6;
-  --border-color: #1f2937;
-  --border-focus: #374151;
-  --danger: #ef4444;
+/* =========================================================================
+   DOMOFON DROP — ENGINE V4 (CLEAN INTERFACE, STRICT ODDS & MOBILE NAV)
+   ========================================================================= */
 
-  --rarity-common: #64748b;
-  --rarity-rare: #0284c7;
-  --rarity-epic: #9333ea;
-  --rarity-legendary: #eab308;
-  --rarity-limited: #ec4899;
+const FIREBASE_URL = "https://sirnik-3356a-default-rtdb.firebaseio.com/";
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
+// Sound Synthesizer via Web Audio API
+const SoundSystem = {
+  ctx: null,
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+    }
+  },
+  playTone(freq, type, duration, vol = 0.08) {
+    try {
+      this.init();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration);
+    } catch (e) {}
+  },
+  click() { this.playTone(800, 'sine', 0.04, 0.05); },
+  win() {
+    this.playTone(523.25, 'sine', 0.12, 0.1);
+    setTimeout(() => this.playTone(659.25, 'sine', 0.12, 0.1), 90);
+    setTimeout(() => this.playTone(783.99, 'sine', 0.25, 0.1), 180);
+  },
+  boom() { this.playTone(90, 'sawtooth', 0.4, 0.25); },
+  gem() { this.playTone(950, 'sine', 0.1, 0.08); },
+  upgradeSuccess() {
+    this.playTone(440, 'triangle', 0.1, 0.1);
+    setTimeout(() => this.playTone(880, 'triangle', 0.35, 0.15), 100);
+  },
+  upgradeFail() {
+    this.playTone(220, 'sawtooth', 0.2, 0.1);
+    setTimeout(() => this.playTone(130, 'sawtooth', 0.35, 0.12), 120);
+  }
+};
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* -------------------------------------------------------------------------
+   ITEMS DATABASE
+   ------------------------------------------------------------------------- */
+const ITEMS = [
+  // Common
+  { id: 1, name: "Domofon Basic", image: "./domofon1.png", price: 300, rarity: "Common" },
+  { id: 7, name: "Domofon Rusty Iron", image: "./domofon7.png", price: 120, rarity: "Common" },
+  { id: 8, name: "Domofon Broken Speaker", image: "./domofon8.png", price: 250, rarity: "Common" },
 
-html {
-  scroll-behavior: smooth;
-}
+  // Rare
+  { id: 2, name: "Domofon Steel", image: "./domofon2.png", price: 1200, rarity: "Rare" },
+  { id: 4, name: "Domofon Chrome", image: "./domofon4.png", price: 2400, rarity: "Rare" },
+  { id: 9, name: "Domofon Guard Pro", image: "./domofon9.png", price: 3200, rarity: "Rare" },
 
-body.dark-theme {
-  background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(circle at 15% 15%, rgba(0, 255, 136, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(192, 38, 211, 0.04) 0%, transparent 40%),
-    linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px),
-    linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
-  color: var(--text-white);
-  font-family: 'Inter', sans-serif;
-  overflow-x: hidden;
-}
+  // Epic
+  { id: 3, name: "Domofon Neon", image: "./domofon3.png", price: 5500, rarity: "Epic" },
+  { id: 5, name: "Domofon Cyber", image: "./domofon5.png", price: 8500, rarity: "Epic" },
+  { id: 10, name: "Domofon Neon Pulse", image: "./domofon10.png", price: 14000, rarity: "Epic" },
 
-h1, h2, h3, .brand-name, .btn, .stat-val, .balance-badge {
-  font-family: 'Chakra Petch', sans-serif;
-  letter-spacing: 0.5px;
-}
+  // Legendary
+  { id: 6, name: "Domofon Golden", image: "./domofon6.png", price: 45000, rarity: "Legendary" },
+  { id: 12, name: "Domofon Quantum Nexus", image: "./domofon12.png", price: 400000, rarity: "Legendary" },
 
-/* FIX Сдвига скролла: компенсирует шапку и live feed */
-section[id] {
-  scroll-margin-top: 100px;
-}
+  // Limited
+  { id: 11, name: "Limited Cyber-Key", image: "./domofon11.png", price: 250000, rarity: "Limited", isLimited: true }
+];
 
-.svg-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  vertical-align: middle;
-}
-.svg-icon-sm { width: 14px; height: 14px; display: inline-block; }
-.svg-icon-lg { width: 36px; height: 36px; display: inline-block; }
-.brand-logo-svg {
-  width: 28px;
-  height: 28px;
-  color: var(--accent-lime);
-  filter: drop-shadow(0 0 8px var(--accent-lime-glow));
-}
-.coin-svg { color: #fbbf24; }
+/* -------------------------------------------------------------------------
+   CASES DATABASE
+   ------------------------------------------------------------------------- */
+const CASES = [
+  {
+    id: "daily_case",
+    name: "Ежедневный Кейс",
+    desc: "Бесплатный кейс каждые 24 часа. Содержит только базовые домофоны и Steel!",
+    price: 0,
+    image: "./domofon2.png",
+    isDaily: true,
+    odds: [
+      { itemId: 7, chance: 50 },
+      { itemId: 8, chance: 30 },
+      { itemId: 1, chance: 15 },
+      { itemId: 2, chance: 5 }
+    ]
+  },
+  {
+    id: "starter",
+    name: "Starter Case",
+    desc: "Базовый кейс за 1 000 💰",
+    price: 1000,
+    image: "./domofon1.png",
+    odds: [
+      { itemId: 7, chance: 50 },
+      { itemId: 1, chance: 35 },
+      { itemId: 2, chance: 15 }
+    ]
+  },
+  {
+    id: "premium",
+    name: "Premium Case",
+    desc: "Кейс за 5 000 💰",
+    price: 5000,
+    image: "./domofon5.png",
+    odds: [
+      { itemId: 4, chance: 60 },
+      { itemId: 3, chance: 30 },
+      { itemId: 5, chance: 10 }
+    ]
+  },
+  {
+    id: "legendary_case",
+    name: "Legendary Case",
+    desc: "Только легендарки: Golden или Quantum Nexus за 400k (5%)!",
+    price: 100000,
+    image: "./domofon6.png",
+    isLegendaryOnly: true,
+    odds: [
+      { itemId: 6, chance: 95 },
+      { itemId: 12, chance: 5 }
+    ]
+  },
+  {
+    id: "allinone",
+    name: "All-in-One Case",
+    desc: "Шанс выбить абсолютно любой домофон из каталога",
+    price: 12000,
+    image: "./domofon9.png",
+    odds: null
+  },
+  {
+    id: "allornothing",
+    name: "Все или Ничего",
+    desc: "Суперриск: Limited Cyber-Key (строго до 10 шт) или ржавая трубка!",
+    price: 80000,
+    image: "./domofon11.png",
+    odds: [
+      { itemId: 7, chance: 88 },
+      { itemId: 11, chance: 12 }
+    ]
+  }
+];
 
-/* LIVE FEED */
-.live-feed-wrapper {
-  background: #080b0f;
-  border-bottom: 1px solid var(--border-color);
-  height: 48px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  position: relative;
-  z-index: 90;
-}
-.live-feed-label {
-  padding: 0 16px;
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--accent-lime);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #080b0f;
-  border-right: 1px solid var(--border-color);
-  height: 100%;
-}
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--accent-lime);
-  border-radius: 50%;
-  animation: pulseGlow 1.5s infinite;
-}
-.live-feed-track {
-  display: flex;
-  gap: 12px;
-  padding: 0 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.live-feed-track::-webkit-scrollbar { display: none; }
-.live-drop-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-card);
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  white-space: nowrap;
-  border: 1px solid var(--border-color);
-  animation: slideInLeft 0.3s ease;
-}
-.live-drop-chip img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
+/* -------------------------------------------------------------------------
+   STATE
+   ------------------------------------------------------------------------- */
+let State = {
+  user: null,
+  balance: 50000,
+  inventory: [],
+  stats: {
+    casesOpened: 0,
+    itemsWon: 0,
+    upgradesWon: 0,
+    itemsSold: 0,
+    coinsSpent: 0
+  },
+  lastDailyClaim: 0,
+  lastDailyCaseClaim: 0,
+  globalLimitedRemaining: 10,
+  upgrader: {
+    mode: "classic",
+    currentInvItem: null,
+    targetItem: null,
+    buffMultiplier: 2.0,
+    chance: 0,
+    isSpinning: false
+  },
+  activeOpening: {
+    caseObj: null,
+    totalQty: 1,
+    pendingRewards: []
+  },
+  trades: []
+};
 
-/* NAVBAR */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(14px);
-  background: rgba(10, 13, 18, 0.85);
-  border-bottom: 1px solid var(--border-color);
-}
-.nav-container {
-  max-width: 1300px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-.brand-name {
-  font-size: 22px;
-  font-weight: 800;
-}
-.brand-name span { color: var(--accent-lime); }
-.nav-menu {
-  display: flex;
-  gap: 20px;
-}
-.nav-link {
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
-  transition: var(--transition);
-}
-.nav-link:hover, .nav-link.active { color: var(--accent-lime); }
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.btn-daily-reward {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #000;
-  font-size: 13px;
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  font-weight: 800;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
-}
-.btn-daily-reward:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  filter: grayscale(1);
-}
-.balance-badge {
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: #fbbf24;
-}
-.avatar-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
+let isTradeActionLocked = false;
+
+/* -------------------------------------------------------------------------
+   AUTH GUARD
+   ------------------------------------------------------------------------- */
+function requireAuth(actionName = "продолжить") {
+  if (!State.user || !State.user.username) {
+    document.getElementById("authNoticeText").innerText = `Чтобы ${actionName}, сначала авторизуйтесь или зарегистрируйтесь!`;
+    UI.openModal("profileModal");
+    UI.toast("Требуется авторизация!", "error");
+    return false;
+  }
+  return true;
 }
 
-/* BUTTONS */
-.btn {
-  border: none;
-  cursor: pointer;
-  padding: 10px 22px;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  font-size: 14px;
-  transition: var(--transition);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-decoration: none;
-}
-.btn-primary {
-  background: var(--accent-lime);
-  color: #032110;
-  box-shadow: 0 0 16px var(--accent-lime-glow);
-}
-.btn-primary:hover {
-  background: #22c55e;
-  transform: translateY(-2px);
-  box-shadow: 0 0 24px rgba(0, 255, 136, 0.6);
-}
-.btn-secondary {
-  background: #1e293b;
-  color: var(--text-white);
-  border: 1px solid var(--border-color);
-}
-.btn-profile {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-white);
-}
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--accent-lime);
-  color: var(--accent-lime);
-}
-.btn-outline:hover {
-  background: var(--accent-lime);
-  color: #000;
-}
-.btn-sm { padding: 6px 14px; font-size: 12px; }
-.btn-block { width: 100%; }
-.btn-danger-ghost {
-  background: transparent;
-  color: var(--danger);
-  border: 1px solid #7f1d1d;
-}
-.btn-danger-ghost:hover { background: var(--danger); color: #fff; }
-
-/* HERO */
-.hero-section {
-  position: relative;
-  max-width: 1300px;
-  margin: 40px auto;
-  padding: 40px 20px;
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  align-items: center;
-  gap: 40px;
-}
-.hero-bg-glow {
-  position: absolute;
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, var(--accent-lime-glow), transparent 70%);
-  top: 10%;
-  left: -50px;
-  z-index: -1;
-  filter: blur(40px);
-}
-.hero-tag {
-  color: var(--accent-lime);
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.hero-title {
-  font-size: 58px;
-  line-height: 1.05;
-  font-weight: 800;
-  margin-bottom: 20px;
-}
-.hero-title span {
-  color: var(--accent-lime);
-  text-shadow: 0 0 20px var(--accent-lime-glow);
-}
-.hero-desc {
-  color: var(--text-muted);
-  font-size: 17px;
-  line-height: 1.6;
-  max-width: 500px;
-  margin-bottom: 32px;
-}
-.hero-btns { display: flex; gap: 16px; }
-.hero-showcase { position: relative; height: 320px; }
-.float-card {
-  position: absolute;
-  width: 170px;
-  height: 200px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-}
-.float-card img { width: 100%; height: 100%; object-fit: contain; }
-.card-1 { top: 10px; left: 30px; animation: floatAnim 4s ease-in-out infinite alternate; }
-.card-2 { top: 60px; right: 20px; animation: floatAnim 4.8s ease-in-out infinite 0.5s alternate; }
-.card-3 { bottom: 0px; left: 110px; animation: floatAnim 5.2s ease-in-out infinite 1s alternate; }
-
-/* SECTIONS */
-.section-block {
-  max-width: 1300px;
-  margin: 60px auto;
-  padding: 0 20px;
-}
-.section-header { margin-bottom: 28px; }
-.section-header h2 { font-size: 28px; font-weight: 800; }
-.section-header p { color: var(--text-muted); font-size: 14px; }
-.flex-between { display: flex; justify-content: space-between; align-items: flex-end; }
-
-/* CASES */
-.cases-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
-}
-.case-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  transition: var(--transition);
-}
-.case-card:hover {
-  transform: translateY(-6px);
-  border-color: var(--accent-lime);
-  box-shadow: 0 12px 30px rgba(0, 255, 136, 0.12);
-}
-.case-card-img {
-  width: 160px;
-  height: 160px;
-  margin-bottom: 16px;
-  object-fit: contain;
-}
-.case-card-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-.case-card-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-  min-height: 38px;
-}
-.case-card-odds {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.odd-tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: #1e293b;
-}
-.case-card-btn-box { width: 100%; margin-top: auto; }
-
-/* RARITIES */
-.rarity-common { border-color: var(--rarity-common) !important; }
-.rarity-rare { border-color: var(--rarity-rare) !important; }
-.rarity-epic { border-color: var(--rarity-epic) !important; }
-.rarity-legendary { border-color: var(--rarity-legendary) !important; }
-.rarity-limited { border-color: var(--rarity-limited) !important; }
-
-.badge-common { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
-.badge-rare { background: rgba(2, 132, 199, 0.2); color: #38bdf8; }
-.badge-epic { background: rgba(147, 51, 234, 0.2); color: #c084fc; }
-.badge-legendary { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-.badge-limited { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
-
-.buff-badge-pill {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: linear-gradient(135deg, #eab308, #ca8a04);
-  color: #000;
-  font-weight: 800;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  box-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
+/* -------------------------------------------------------------------------
+   STORAGE & SYNC
+   ------------------------------------------------------------------------- */
+function loadState() {
+  const local = localStorage.getItem("domofon_drop_session_v4");
+  if (local) {
+    try {
+      const parsed = JSON.parse(local);
+      State = { ...State, ...parsed };
+    } catch (e) {}
+  }
 }
 
-/* UPGRADER */
-.upgrader-mode-tabs {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.upg-tab-btn {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  padding: 10px 20px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-weight: 700;
-}
-.upg-tab-btn.active {
-  background: var(--accent-lime);
-  color: #000;
-  border-color: var(--accent-lime);
-}
-.upgrader-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 30px;
-  display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
-  gap: 24px;
-  align-items: center;
-}
-.upgrade-slot-box {
-  background: var(--bg-slot);
-  border: 1px dashed var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-}
-.slot-header {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-.slot-body { margin: 16px 0; display: flex; flex-direction: column; align-items: center; }
-.empty-slot-msg { color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 50px; }
-.upgrade-center { display: flex; flex-direction: column; align-items: center; }
-.wheel-stage {
-  position: relative;
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.wheel-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(var(--accent-lime) 0deg, var(--accent-lime) 0deg, #1e293b 0deg 360deg);
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  transition: background 0.3s ease;
-}
-.wheel-arrow-pivot {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  pointer-events: none;
-  transform: rotate(0deg);
-  z-index: 10;
-}
-.wheel-arrow-pin {
-  position: absolute;
-  top: -8px;
-  left: calc(50% - 10px);
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 22px solid #ff0055;
-  filter: drop-shadow(0 0 6px #ff0055);
-}
-.wheel-hub {
-  position: relative;
-  z-index: 5;
-  width: 160px;
-  height: 160px;
-  background: var(--bg-card);
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.wheel-chance-val { font-size: 34px; font-weight: 800; color: var(--accent-lime); }
-.wheel-chance-lbl { font-size: 11px; color: var(--text-muted); }
-.buff-multipliers-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
-.btn-buff-mult {
-  background: var(--bg-slot);
-  border: 1px solid var(--border-color);
-  color: var(--text-white);
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-weight: 800;
-  cursor: pointer;
-}
-.btn-buff-mult.active {
-  background: var(--accent-gold);
-  color: #000;
-  border-color: var(--accent-gold);
-}
-.upgrade-stats-row { margin: 16px 0; font-size: 15px; font-weight: 700; color: var(--text-muted); }
-.btn-upgrade-launch {
-  background: linear-gradient(135deg, #00ff88, #00bd65);
-  color: #022412;
-  font-size: 16px;
-  padding: 14px 40px;
-  border-radius: var(--radius-md);
-  box-shadow: 0 0 20px var(--accent-lime-glow);
-}
-.btn-upgrade-launch:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
-
-/* TRADES (P2P REAL) */
-.trades-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-.trade-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.trade-user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 13px;
-}
-.trade-exchange-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  background: var(--bg-slot);
-  padding: 12px;
-  border-radius: var(--radius-sm);
-}
-.trade-slot-mini {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-.trade-slot-mini img { width: 55px; height: 55px; object-fit: contain; }
-.trade-slot-mini span { font-size: 11px; font-weight: 700; margin-top: 4px; }
-
-/* MULTI-ROULETTE */
-.multi-roulette-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 6px;
-}
-.roulette-viewport {
-  position: relative;
-  width: 100%;
-  height: 120px;
-  background: #090d14;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.roulette-pointer-top, .roulette-pointer-bottom {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  z-index: 20;
-}
-.roulette-pointer-top {
-  top: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 12px solid var(--accent-lime);
-}
-.roulette-pointer-bottom {
-  bottom: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-bottom: 12px solid var(--accent-lime);
-}
-.roulette-track {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  position: absolute;
-  left: 0;
-  top: 0;
-  will-change: transform;
-}
-.roulette-card {
-  width: 110px;
-  height: 100px;
-  margin: 0 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  flex-shrink: 0;
-  position: relative;
-}
-.roulette-card img { width: 50px; height: 50px; object-fit: contain; }
-.roulette-card-name { font-size: 10px; font-weight: 700; text-align: center; margin-top: 4px; }
-
-.roulette-result-reveal {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  margin-top: 20px;
-  animation: zoomGlow 0.5s ease;
-}
-.win-heading { font-size: 26px; font-weight: 800; color: var(--accent-lime); margin-bottom: 12px; }
-.win-items-grid {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 20px;
+function saveState() {
+  localStorage.setItem("domofon_drop_session_v4", JSON.stringify(State));
+  UI.renderBalance();
+  syncUserDataToFirebase();
 }
 
-/* CLICKER */
-.clicker-arena {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.domofon-button-big {
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #1f293d, #0f172a);
-  border: 4px solid var(--accent-lime);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 30px var(--accent-lime-glow);
-  color: var(--accent-lime);
-  user-select: none;
-}
-.domofon-button-big:active { transform: scale(0.92); }
-.domofon-btn-txt { font-size: 13px; font-weight: 800; margin-top: 8px; }
-.float-coin-text {
-  position: absolute;
-  color: #fbbf24;
-  font-weight: 800;
-  font-size: 20px;
-  pointer-events: none;
-  animation: floatUp 0.8s forwards ease-out;
+async function fetchLimitedPool() {
+  try {
+    const res = await fetch(`${FIREBASE_URL}limitedCount.json`);
+    const val = await res.json();
+    if (val !== null && typeof val === "number") {
+      State.globalLimitedRemaining = val;
+    }
+  } catch (e) {}
 }
 
-/* CARDS */
-.inventory-grid, .collection-grid, .picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
+async function decrementLimitedPool() {
+  try {
+    const res = await fetch(`${FIREBASE_URL}limitedCount.json`);
+    let val = await res.json();
+    if (val === null || typeof val !== "number") val = 10;
+    val = Math.max(0, val - 1);
+    await fetch(`${FIREBASE_URL}limitedCount.json`, {
+      method: "PUT",
+      body: JSON.stringify(val)
+    });
+    State.globalLimitedRemaining = val;
+  } catch (e) {
+    State.globalLimitedRemaining = Math.max(0, State.globalLimitedRemaining - 1);
+  }
 }
-.item-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  position: relative;
-  transition: var(--transition);
-}
-.item-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-.item-card-img { width: 90px; height: 90px; object-fit: contain; margin-bottom: 8px; }
-.item-card-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-.item-card-rarity { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; margin-bottom: 6px; }
-.item-card-price { font-size: 13px; font-weight: 700; color: #fbbf24; margin-bottom: 10px; }
 
-/* LEADERBOARD */
-.table-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-}
-.custom-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-.custom-table th { padding: 14px 20px; background: #0f172a; color: var(--text-muted); font-weight: 600; }
-.custom-table td { padding: 14px 20px; border-top: 1px solid var(--border-color); }
-.custom-table tr:hover { background: #172033; cursor: pointer; }
-.table-player-cell { display: flex; align-items: center; gap: 10px; }
-.table-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+async function syncUserDataToFirebase() {
+  if (!State.user || !State.user.username) return;
+  const usernameClean = encodeURIComponent(State.user.username);
+  const payload = {
+    username: State.user.username,
+    avatar: State.user.avatar || "",
+    balance: State.balance,
+    inventoryWorth: State.inventory.reduce((acc, i) => acc + (i.price * (i.buffMult || 1)), 0),
+    casesOpened: State.stats.casesOpened,
+    inventory: State.inventory,
+    updatedAt: Date.now()
+  };
 
-/* STATS */
-.stats-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 20px;
+  try {
+    await fetch(`${FIREBASE_URL}players/${usernameClean}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {}
 }
-.stat-card { text-align: center; }
-.stat-val { font-size: 26px; font-weight: 800; color: var(--accent-lime); margin-bottom: 4px; }
-.stat-lbl { font-size: 12px; color: var(--text-muted); }
-.reset-zone { display: flex; justify-content: flex-end; }
 
-/* FOOTER */
-.footer {
-  border-top: 1px solid var(--border-color);
-  padding: 40px 20px;
-  max-width: 1300px;
-  margin: 40px auto 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.footer-top { display: flex; justify-content: space-between; align-items: center; }
-.footer-note { color: var(--text-muted); font-size: 13px; }
-.footer-links { display: flex; gap: 20px; }
-.footer-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; }
-.footer-links a:hover { color: var(--accent-lime); }
+async function authLogin(username, password) {
+  if (!username || !password) return UI.toast("Заполните оба поля!", "error");
+  const clean = encodeURIComponent(username.trim());
 
-/* TOASTS */
-.toast-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.toast {
-  background: #111827;
-  border-left: 4px solid var(--accent-lime);
-  color: var(--text-white);
-  padding: 12px 18px;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.6);
-  font-size: 14px;
-  animation: slideInRight 0.3s ease;
-}
-.toast.error { border-left-color: var(--danger); }
+  try {
+    const res = await fetch(`${FIREBASE_URL}users/${clean}.json`);
+    const userData = await res.json();
+    if (!userData || userData.password !== password) {
+      return UI.toast("Неверный логин или пароль!", "error");
+    }
 
-/* MODALS */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.85);
-  backdrop-filter: blur(8px);
-  z-index: 1000;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-overlay.active { display: flex; }
-.modal-box {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 480px;
-  padding: 30px;
-  position: relative;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-.modal-box.modal-wide { max-width: 860px; }
-.modal-close-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 26px;
-  cursor: pointer;
-}
-.modal-case-preview { text-align: center; margin-bottom: 20px; }
-.modal-case-preview img { width: 120px; height: 120px; object-fit: contain; margin-bottom: 12px; }
-.qty-buttons { display: flex; gap: 8px; margin: 12px 0 20px; }
-.btn-qty {
-  flex: 1;
-  background: var(--bg-slot);
-  border: 1px solid var(--border-color);
-  color: var(--text-white);
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-weight: 700;
-}
-.btn-qty.active { background: var(--accent-lime); color: #000; border-color: var(--accent-lime); }
-.cfg-total-cost { font-size: 16px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+    const pRes = await fetch(`${FIREBASE_URL}players/${clean}.json`);
+    const pData = await pRes.json();
 
-/* PROFILE & AUTH */
-.profile-header { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; }
-.avatar-large {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--accent-lime);
-}
-.avatar-upload-btn { display: block; font-size: 11px; color: var(--accent-lime); cursor: pointer; margin-top: 6px; }
-.profile-stats-list { background: var(--bg-slot); padding: 16px; border-radius: var(--radius-md); margin-bottom: 20px; }
-.pstat-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-.cloud-sync-status { font-size: 11px; color: var(--accent-lime); margin-bottom: 16px; }
-.form-group { margin-bottom: 14px; }
-.form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-.form-control {
-  width: 100%;
-  background: var(--bg-slot);
-  border: 1px solid var(--border-color);
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  color: var(--text-white);
-}
-.auth-sub { font-size: 13px; color: var(--text-muted); margin: 6px 0 18px; }
-.auth-actions { display: flex; gap: 10px; margin-top: 20px; }
+    State.user = { username: userData.username, avatar: userData.avatar || "" };
+    if (pData) {
+      State.balance = pData.balance ?? 50000;
+      State.inventory = pData.inventory || [];
+      State.stats.casesOpened = pData.casesOpened || 0;
+    }
 
-/* ANIMATIONS */
-@keyframes pulseGlow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-@keyframes floatAnim { 0% { transform: translateY(0px); } 100% { transform: translateY(-12px); } }
-@keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }
-@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideInLeft { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes zoomGlow { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    UI.toast(`С возвращением, ${State.user.username}!`);
+    UI.closeModal("profileModal");
+    saveState();
+    refreshProfileUI();
+    UI.renderInventory();
+    loadLeaderboard();
+  } catch (e) {
+    UI.toast("Ошибка входа в аккаунт", "error");
+  }
+}
 
-@media (max-width: 900px) {
-  .hero-section { grid-template-columns: 1fr; text-align: center; }
-  .hero-desc { margin: 0 auto 30px; }
-  .hero-btns { justify-content: center; }
-  .hero-showcase { display: none; }
-  .upgrader-panel { grid-template-columns: 1fr; }
-  .nav-menu { display: none; }
+async function authRegister(username, password) {
+  if (!username || !password) return UI.toast("Заполните оба поля!", "error");
+  if (username.trim().length < 3) return UI.toast("Никнейм должен быть от 3 символов!", "error");
+  const clean = encodeURIComponent(username.trim());
+
+  try {
+    const checkRes = await fetch(`${FIREBASE_URL}users/${clean}.json`);
+    const existing = await checkRes.json();
+    if (existing) return UI.toast("Никнейм уже занят!", "error");
+
+    const newUser = {
+      username: username.trim(),
+      password: password,
+      avatar: "",
+      createdAt: Date.now()
+    };
+
+    await fetch(`${FIREBASE_URL}users/${clean}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newUser)
+    });
+
+    State.user = { username: newUser.username, avatar: "" };
+    State.balance = 50000;
+    State.inventory = [];
+    State.stats.casesOpened = 0;
+
+    UI.toast("Регистрация успешна! Начислено 50 000 💰");
+    UI.closeModal("profileModal");
+    saveState();
+    refreshProfileUI();
+    UI.renderInventory();
+    loadLeaderboard();
+  } catch (e) {
+    UI.toast("Не удалось зарегистрироваться", "error");
+  }
 }
-@media (max-width: 600px) {
-  .inventory-grid, .collection-grid { grid-template-columns: repeat(2, 1fr); }
-  .cases-grid { grid-template-columns: 1fr; }
-  .hero-title { font-size: 40px; }
+
+async function loadLeaderboard() {
+  const tbody = document.getElementById("leaderboardBody");
+  tbody.innerHTML = "<tr><td colspan='4'>Загрузка...</td></tr>";
+
+  let players = [];
+  try {
+    const res = await fetch(`${FIREBASE_URL}players.json`);
+    const data = await res.json();
+    if (data) players = Object.values(data);
+  } catch (e) {}
+
+  if (State.user && !players.find(p => p.username === State.user.username)) {
+    players.push({
+      username: State.user.username,
+      avatar: State.user.avatar || "",
+      balance: State.balance,
+      inventoryWorth: State.inventory.reduce((a, b) => a + (b.price * (b.buffMult || 1)), 0),
+      casesOpened: State.stats.casesOpened,
+      inventory: State.inventory
+    });
+  }
+
+  players.sort((a, b) => ((b.inventoryWorth || 0) + (b.balance || 0)) - ((a.inventoryWorth || 0) + (a.balance || 0)));
+
+  tbody.innerHTML = "";
+  if (players.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='4' style='color:var(--text-muted);'>Нет игроков</td></tr>";
+    return;
+  }
+
+  players.slice(0, 10).forEach((p, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>#${idx + 1}</b></td>
+      <td>
+        <div class="table-player-cell">
+          <img src="${p.avatar || 'https://placehold.co/40x40/121720/00ff88?text=U'}" class="table-avatar" alt="">
+          <span>${p.username}</span>
+        </div>
+      </td>
+      <td>${(p.balance || 0).toLocaleString()} 💰</td>
+      <td style="color: var(--accent-lime);">${(p.inventoryWorth || 0).toLocaleString()} 💰</td>
+    `;
+    tr.onclick = () => openInspectPlayerModal(p);
+    tbody.appendChild(tr);
+  });
 }
+
+function openInspectPlayerModal(player) {
+  document.getElementById("inspectName").innerText = player.username;
+  document.getElementById("inspectAvatar").src = player.avatar || "https://placehold.co/80x80/121720/00ff88?text=U";
+  document.getElementById("inspectSummary").innerText = 
+    `Баланс: ${(player.balance || 0).toLocaleString()} 💰 | Оценка: ${(player.inventoryWorth || 0).toLocaleString()} 💰`;
+
+  const grid = document.getElementById("inspectInventoryGrid");
+  grid.innerHTML = "";
+
+  const items = player.inventory || [];
+  if (items.length === 0) {
+    grid.innerHTML = "<p style='color:var(--text-muted); grid-column:1/-1;'>Инвентарь пуст</p>";
+  } else {
+    items.forEach(itm => {
+      const el = document.createElement("div");
+      el.className = `item-card rarity-${itm.rarity.toLowerCase()}`;
+      el.innerHTML = `
+        <img src="${itm.image}" onerror="this.onerror=null; this.src='https://placehold.co/100x100/121720/00ff88?text=Domofon'" class="item-card-img" alt="">
+        <div class="item-card-name">${itm.name}</div>
+        <span class="item-card-rarity badge-${itm.rarity.toLowerCase()}">${itm.rarity}</span>
+        <div class="item-card-price">${itm.price.toLocaleString()} 💰</div>
+      `;
+      grid.appendChild(el);
+    });
+  }
+  UI.openModal("inspectPlayerModal");
+}
+
+/* -------------------------------------------------------------------------
+   P2P TRADES
+   ------------------------------------------------------------------------- */
+async function loadTradesFromFirebase() {
+  try {
+    const res = await fetch(`${FIREBASE_URL}trades.json`);
+    const data = await res.json();
+    State.trades = data ? Object.entries(data).map(([key, val]) => ({ firebaseKey: key, ...val })) : [];
+  } catch (e) {
+    State.trades = [];
+  }
+  renderTrades();
+}
+
+function renderTrades() {
+  const cont = document.getElementById("tradesContainer");
+  cont.innerHTML = "";
+
+  if (State.trades.length === 0) {
+    cont.innerHTML = "<p style='color:var(--text-muted);'>Активных офферов пока нет. Создайте первый!</p>";
+    return;
+  }
+
+  State.trades.forEach(tr => {
+    const isMine = State.user && State.user.username === tr.creator;
+    const card = document.createElement("div");
+    card.className = "trade-card";
+    card.innerHTML = `
+      <div class="trade-user-info">
+        <img src="${tr.avatar || 'https://placehold.co/40x40/121720/00ff88?text=U'}" class="table-avatar" alt="">
+        <span>${tr.creator} ${isMine ? '<b style="color:var(--accent-lime);">(Ваш оффер)</b>' : ''}</span>
+      </div>
+      <div class="trade-exchange-row">
+        <div class="trade-slot-mini">
+          <img src="${tr.offering.image}" onerror="this.onerror=null; this.src='https://placehold.co/60x60/121720/00ff88?text=Domofon'" alt="">
+          <span>Отдает: <b>${tr.offering.name}</b></span>
+        </div>
+        <div style="font-weight: 800; color: var(--accent-lime);">➔</div>
+        <div class="trade-slot-mini">
+          <img src="${tr.wanting.image}" onerror="this.onerror=null; this.src='https://placehold.co/60x60/121720/00ff88?text=Domofon'" alt="">
+          <span>Хочет: <b>${tr.wanting.name}</b></span>
+        </div>
+      </div>
+      ${isMine 
+        ? `<button class="btn btn-danger-ghost btn-block btn-sm trade-action-btn" onclick="cancelTrade(this, '${tr.firebaseKey}')">Отменить и вернуть</button>` 
+        : `<button class="btn btn-outline btn-block btn-sm trade-action-btn" onclick="acceptTrade(this, '${tr.firebaseKey}')">Обменяться</button>`
+      }
+    `;
+    cont.appendChild(card);
+  });
+}
+
+function openCreateTradeModal() {
+  if (!requireAuth("создавать трейды")) return;
+  if (State.inventory.length === 0) return UI.toast("Ваш инвентарь пуст!", "error");
+
+  const mySelect = document.getElementById("tradeOfferMyItemSelect");
+  mySelect.innerHTML = "";
+  State.inventory.forEach(itm => {
+    const opt = document.createElement("option");
+    opt.value = itm.uid;
+    opt.innerText = `${itm.name} (${itm.price.toLocaleString()} 💰)`;
+    mySelect.appendChild(opt);
+  });
+
+  const wantSelect = document.getElementById("tradeOfferWantedItemSelect");
+  wantSelect.innerHTML = "";
+  ITEMS.forEach(itm => {
+    const opt = document.createElement("option");
+    opt.value = itm.id;
+    opt.innerText = `${itm.name} (${itm.price.toLocaleString()} 💰)`;
+    wantSelect.appendChild(opt);
+  });
+
+  UI.openModal("createTradeModal");
+}
+
+async function submitCreateTrade() {
+  if (!requireAuth("создать трейд")) return;
+  if (isTradeActionLocked) return;
+
+  const myItemUid = parseFloat(document.getElementById("tradeOfferMyItemSelect").value);
+  const wantItemId = parseInt(document.getElementById("tradeOfferWantedItemSelect").value, 10);
+
+  const invIdx = State.inventory.findIndex(i => i.uid === myItemUid);
+  if (invIdx === -1) return UI.toast("Предмет не найден в инвентаре!", "error");
+
+  isTradeActionLocked = true;
+  const offeringItem = State.inventory.splice(invIdx, 1)[0];
+  const wantingItem = ITEMS.find(i => i.id === wantItemId);
+  saveState();
+  UI.renderInventory();
+
+  const tradePayload = {
+    creator: State.user.username,
+    avatar: State.user.avatar || "",
+    offering: offeringItem,
+    wanting: wantingItem,
+    createdAt: Date.now()
+  };
+
+  try {
+    await fetch(`${FIREBASE_URL}trades.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tradePayload)
+    });
+    UI.closeModal("createTradeModal");
+    UI.toast("Оффер опубликован!");
+    await loadTradesFromFirebase();
+  } catch (e) {
+    State.inventory.push(offeringItem);
+    saveState();
+    UI.renderInventory();
+    UI.toast("Ошибка создания трейда", "error");
+  } finally {
+    isTradeActionLocked = false;
+  }
+}
+
+async function cancelTrade(btnEl, firebaseKey) {
+  if (!requireAuth("отменить трейд")) return;
+  if (isTradeActionLocked) return;
+
+  isTradeActionLocked = true;
+  if (btnEl) btnEl.disabled = true;
+
+  try {
+    const check = await fetch(`${FIREBASE_URL}trades/${firebaseKey}.json`);
+    const tradeData = await check.json();
+
+    if (!tradeData || tradeData.creator !== State.user.username) {
+      UI.toast("Оффер уже отменен или принят!", "error");
+      await loadTradesFromFirebase();
+      return;
+    }
+
+    await fetch(`${FIREBASE_URL}trades/${firebaseKey}.json`, { method: "DELETE" });
+
+    State.inventory.push(tradeData.offering);
+    saveState();
+    UI.renderInventory();
+    UI.toast("Оффер отменен, предмет возвращен в инвентарь!");
+    await loadTradesFromFirebase();
+  } catch (e) {
+    UI.toast("Ошибка при отмене оффера", "error");
+  } finally {
+    isTradeActionLocked = false;
+  }
+}
+
+async function acceptTrade(btnEl, firebaseKey) {
+  if (!requireAuth("принять трейд")) return;
+  if (isTradeActionLocked) return;
+
+  const tr = State.trades.find(t => t.firebaseKey === firebaseKey);
+  if (!tr) return;
+
+  const myItemIdx = State.inventory.findIndex(i => i.id === tr.wanting.id);
+  if (myItemIdx === -1) {
+    UI.toast(`У вас нет предмета ${tr.wanting.name} для этого обмена!`, "error");
+    return;
+  }
+
+  isTradeActionLocked = true;
+  if (btnEl) btnEl.disabled = true;
+
+  const myItem = State.inventory.splice(myItemIdx, 1)[0];
+
+  try {
+    const res = await fetch(`${FIREBASE_URL}trades/${firebaseKey}.json`);
+    const currentTrade = await res.json();
+    if (!currentTrade) {
+      State.inventory.push(myItem);
+      UI.toast("Этот оффер уже был принят!", "error");
+      await loadTradesFromFirebase();
+      return;
+    }
+
+    await fetch(`${FIREBASE_URL}trades/${firebaseKey}.json`, { method: "DELETE" });
+
+    State.inventory.push({ ...tr.offering, uid: Date.now() + Math.random() });
+    saveState();
+    UI.renderInventory();
+    SoundSystem.win();
+    UI.toast(`Обмен с ${tr.creator} успешно завершен!`);
+
+    const creatorClean = encodeURIComponent(tr.creator);
+    const cRes = await fetch(`${FIREBASE_URL}players/${creatorClean}.json`);
+    const cData = await cRes.json();
+    if (cData) {
+      cData.inventory = cData.inventory || [];
+      cData.inventory.push({ ...myItem, uid: Date.now() + Math.random() });
+      cData.inventoryWorth = cData.inventory.reduce((a, b) => a + (b.price * (b.buffMult || 1)), 0);
+      await fetch(`${FIREBASE_URL}players/${creatorClean}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cData)
+      });
+    }
+
+    await loadTradesFromFirebase();
+  } catch (e) {
+    State.inventory.push(myItem);
+    saveState();
+    UI.renderInventory();
+    UI.toast("Ошибка проведения обмена", "error");
+  } finally {
+    isTradeActionLocked = false;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   DAILY 50 000 BONUS
+   ------------------------------------------------------------------------- */
+function checkDailyBonus() {
+  const now = Date.now();
+  const cooldown = 24 * 60 * 60 * 1000;
+  const btn = document.getElementById("dailyRewardBtn");
+  const txt = document.getElementById("dailyBtnText");
+
+  if (now - State.lastDailyClaim >= cooldown) {
+    btn.disabled = false;
+    txt.innerText = "Ежедневный бонус: +50 000 💰 ЗАБРАТЬ";
+  } else {
+    btn.disabled = true;
+    const hoursLeft = Math.ceil((cooldown - (now - State.lastDailyClaim)) / (1000 * 60 * 60));
+    txt.innerText = `Бонус 50 000 💰 через ${hoursLeft}ч`;
+  }
+}
+
+function claimDailyBonus() {
+  if (!requireAuth("забрать бонус")) return;
+
+  const now = Date.now();
+  const cooldown = 24 * 60 * 60 * 1000;
+  if (now - State.lastDailyClaim < cooldown) return;
+
+  State.balance += 50000;
+  State.lastDailyClaim = now;
+  SoundSystem.win();
+  UI.toast("+50 000 💰 успешно получены!");
+  saveState();
+  checkDailyBonus();
+}
+
+/* -------------------------------------------------------------------------
+   CLICKER COINS
+   ------------------------------------------------------------------------- */
+function registerCoinClick(e) {
+  if (!requireAuth("кликать монеты")) return;
+
+  State.balance += 50;
+  SoundSystem.click();
+  UI.renderBalance();
+  saveState();
+
+  const btn = e.currentTarget;
+  const floatEl = document.createElement("div");
+  floatEl.className = "float-coin-text";
+  floatEl.innerText = "+50 💰";
+  floatEl.style.left = `${(e.clientX || (btn.getBoundingClientRect().left + 40))}px`;
+  floatEl.style.top = `${((e.clientY || btn.getBoundingClientRect().top) - 20)}px`;
+  document.body.appendChild(floatEl);
+
+  setTimeout(() => floatEl.remove(), 800);
+}
+
+/* -------------------------------------------------------------------------
+   КЕЙСЫ
+   ------------------------------------------------------------------------- */
+async function selectWinningItem(caseObj) {
+  if (caseObj.id === "allornothing") {
+    await fetchLimitedPool();
+    const roll = Math.random() * 100;
+    if (roll <= 12) {
+      if (State.globalLimitedRemaining > 0) {
+        await decrementLimitedPool();
+        return ITEMS.find(i => i.id === 11);
+      } else {
+        UI.toast("Все 10 Лимиток уже выбиты!", "error");
+        return ITEMS.find(i => i.id === 7);
+      }
+    }
+    return ITEMS.find(i => i.id === 7);
+  }
+
+  if (caseObj.id === "allinone") {
+    const regularPool = ITEMS.filter(i => !i.isLimited);
+    return regularPool[Math.floor(Math.random() * regularPool.length)];
+  }
+
+  if (caseObj.odds && caseObj.odds.length > 0) {
+    const totalChance = caseObj.odds.reduce((sum, o) => sum + o.chance, 0);
+    let rand = Math.random() * totalChance;
+    let running = 0;
+
+    for (let odd of caseObj.odds) {
+      running += odd.chance;
+      if (rand <= running) {
+        const found = ITEMS.find(i => i.id === odd.itemId);
+        if (caseObj.id === "legendary_case" && found.id === 6 && Math.random() < 0.35) {
+          return { ...found, price: found.price * 2, buffMult: 2.0, isBuffed: true };
+        }
+        return { ...found };
+      }
+    }
+    return ITEMS.find(i => i.id === caseObj.odds[0].itemId);
+  }
+
+  return ITEMS.find(i => i.id === 1);
+}
+
+async function startCaseOpening(caseObj, quantity) {
+  if (!requireAuth("открывать кейсы")) return;
+
+  if (caseObj.isDaily) {
+    const now = Date.now();
+    const cooldown = 24 * 60 * 60 * 1000;
+    if (now - State.lastDailyCaseClaim < cooldown) {
+      const remainingHrs = Math.ceil((cooldown - (now - State.lastDailyCaseClaim)) / (1000 * 60 * 60));
+      UI.toast(`Ежедневный кейс будет доступен через ${remainingHrs} ч.`, "error");
+      return;
+    }
+    State.lastDailyCaseClaim = now;
+    quantity = 1;
+  } else {
+    const totalCost = caseObj.price * quantity;
+    if (State.balance < totalCost) {
+      UI.toast("Недостаточно монет для открытия!", "error");
+      return;
+    }
+    State.balance -= totalCost;
+    State.stats.coinsSpent += totalCost;
+  }
+
+  State.stats.casesOpened += quantity;
+  saveState();
+
+  const winningItems = [];
+  for (let q = 0; q < quantity; q++) {
+    winningItems.push(await selectWinningItem(caseObj));
+  }
+
+  State.activeOpening = {
+    caseObj,
+    totalQty: quantity,
+    pendingRewards: winningItems
+  };
+
+  runMultiRoulette(caseObj, winningItems);
+}
+
+function runMultiRoulette(caseObj, winningItems) {
+  UI.openModal("rouletteModal");
+  document.getElementById("rouletteCaseName").innerText = caseObj.name;
+  document.getElementById("rouletteSubTitle").innerText = `Открытие: ${winningItems.length} шт.`;
+  document.getElementById("rouletteResultReveal").style.display = "none";
+
+  const container = document.getElementById("multiRouletteContainer");
+  container.innerHTML = "";
+
+  let casePool = [];
+  if (caseObj.id === "allinone") {
+    casePool = ITEMS.filter(i => !i.isLimited);
+  } else if (caseObj.odds && caseObj.odds.length > 0) {
+    casePool = caseObj.odds.map(o => ITEMS.find(i => i.id === o.itemId)).filter(Boolean);
+  } else {
+    casePool = [ITEMS[0]];
+  }
+
+  const cardCount = 42;
+  const winIndex = 36;
+
+  winningItems.forEach((winItem, idx) => {
+    const vp = document.createElement("div");
+    vp.className = "roulette-viewport";
+    vp.innerHTML = `
+      <div class="roulette-pointer-top"></div>
+      <div class="roulette-pointer-bottom"></div>
+      <div class="roulette-track" id="rTrack_${idx}"></div>
+    `;
+    container.appendChild(vp);
+
+    const track = vp.querySelector(".roulette-track");
+    for (let i = 0; i < cardCount; i++) {
+      const itm = (i === winIndex) ? winItem : casePool[Math.floor(Math.random() * casePool.length)];
+      const c = document.createElement("div");
+      c.className = `roulette-card rarity-${itm.rarity.toLowerCase()}`;
+      let buffTag = (itm.isBuffed || (i === winIndex && winItem.isBuffed)) ? `<span class="buff-badge-pill">x2</span>` : "";
+
+      c.innerHTML = `
+        ${buffTag}
+        <img src="${itm.image}" onerror="this.onerror=null; this.src='https://placehold.co/70x70/121720/00ff88?text=Domofon'" alt="">
+        <span class="roulette-card-name">${itm.name}</span>
+      `;
+      track.appendChild(c);
+    }
+  });
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      SoundSystem.playTone(300, 'triangle', 4.5, 0.05);
+
+      const cardWidth = 92;
+      const vpWidth = container.querySelector(".roulette-viewport").offsetWidth;
+      const targetOffset = (winIndex * cardWidth) - (vpWidth / 2) + (cardWidth / 2);
+
+      winningItems.forEach((_, idx) => {
+        const track = document.getElementById(`rTrack_${idx}`);
+        const jitter = (Math.random() * 20) - 10;
+        const finalTranslate = -(targetOffset + jitter);
+
+        track.style.transition = `transform ${4.8 + (idx * 0.12)}s cubic-bezier(0.12, 0.8, 0.18, 1)`;
+        track.style.transform = `translateX(${finalTranslate}px)`;
+      });
+
+      setTimeout(() => {
+        SoundSystem.win();
+        showMultiResults(winningItems);
+      }, 5100 + (winningItems.length * 120));
+    }, 50);
+  });
+}
+
+function showMultiResults(items) {
+  const reveal = document.getElementById("rouletteResultReveal");
+  const listGrid = document.getElementById("winItemsListGrid");
+  listGrid.innerHTML = "";
+
+  items.forEach(itm => {
+    const card = document.createElement("div");
+    card.className = `item-card rarity-${itm.rarity.toLowerCase()}`;
+    let buffTag = itm.isBuffed ? `<span class="buff-badge-pill">x2 БАФФ</span>` : "";
+
+    card.innerHTML = `
+      ${buffTag}
+      <img src="${itm.image}" onerror="this.onerror=null; this.src='https://placehold.co/80x80/121720/00ff88?text=Domofon'" class="item-card-img" alt="">
+      <div class="item-card-name">${itm.name}</div>
+      <span class="item-card-rarity badge-${itm.rarity.toLowerCase()}">${itm.rarity}</span>
+      <div class="item-card-price">${itm.price.toLocaleString()} 💰</div>
+    `;
+    listGrid.appendChild(card);
+    addLiveDropFeed(itm, State.user ? State.user.username : "Игрок");
+  });
+
+  reveal.style.display = "flex";
+}
+
+/* -------------------------------------------------------------------------
+   CRASH GAME
+   ------------------------------------------------------------------------- */
+const CrashGame = {
+  canvas: null,
+  ctx: null,
+  state: 'idle',
+  bet: 0,
+  multiplier: 1.0,
+  crashPoint: 0,
+  startTime: 0,
+  animId: null,
+
+  init() {
+    this.canvas = document.getElementById('crashCanvas');
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    this.drawScene(1.0);
+  },
+
+  resize() {
+    if (!this.canvas) return;
+    this.canvas.width = this.canvas.parentElement.offsetWidth;
+    this.canvas.height = this.canvas.parentElement.offsetHeight;
+    this.drawScene(this.multiplier);
+  },
+
+  start() {
+    if (!requireAuth("запустить Ракетку")) return;
+    if (this.state === 'running') return;
+
+    const betVal = parseInt(document.getElementById('crashBetInput').value, 10);
+    if (isNaN(betVal) || betVal <= 0) return UI.toast("Укажите ставку!", "error");
+    if (State.balance < betVal) return UI.toast("Недостаточно монет для ставки!", "error");
+
+    State.balance -= betVal;
+    State.stats.coinsSpent += betVal;
+    saveState();
+
+    this.bet = betVal;
+    this.state = 'running';
+    this.multiplier = 1.0;
+    this.startTime = performance.now();
+
+    const r = Math.random();
+    this.crashPoint = Math.max(1.05, +(0.95 / (1 - r)).toFixed(2));
+
+    const btn = document.getElementById('crashActionBtn');
+    btn.innerText = "ЗАБРАТЬ ВЫИГРЫШ";
+    btn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+
+    const status = document.getElementById('crashStatusText');
+    status.innerText = "Ракета на взлёте...";
+    status.style.color = "var(--accent-lime)";
+
+    const multTxt = document.getElementById('crashMultText');
+    multTxt.classList.remove('crashed');
+
+    this.loop();
+  },
+
+  cashout() {
+    if (this.state !== 'running') return;
+    this.state = 'idle';
+    cancelAnimationFrame(this.animId);
+
+    const winAmount = Math.round(this.bet * this.multiplier);
+    State.balance += winAmount;
+    saveState();
+
+    SoundSystem.win();
+    UI.toast(`ПОБЕДА! +${winAmount.toLocaleString()} 💰 (${this.multiplier.toFixed(2)}x)`);
+
+    const btn = document.getElementById('crashActionBtn');
+    btn.innerText = "ЗАПУСТИТЬ РАКЕТУ";
+    btn.style.background = "";
+
+    const status = document.getElementById('crashStatusText');
+    status.innerText = `Забрано на ${this.multiplier.toFixed(2)}x!`;
+    status.style.color = "#fbbf24";
+  },
+
+  crash() {
+    this.state = 'crashed';
+    cancelAnimationFrame(this.animId);
+    SoundSystem.boom();
+
+    const multTxt = document.getElementById('crashMultText');
+    multTxt.innerText = this.crashPoint.toFixed(2) + 'x';
+    multTxt.classList.add('crashed');
+
+    const status = document.getElementById('crashStatusText');
+    status.innerText = "КРАШ! РАКЕТА ВЗОРВАЛАСЬ";
+    status.style.color = "var(--danger)";
+
+    const btn = document.getElementById('crashActionBtn');
+    btn.innerText = "ЗАПУСТИТЬ РАКЕТУ";
+    btn.style.background = "";
+  },
+
+  loop() {
+    if (this.state !== 'running') return;
+    const now = performance.now();
+    const elapsed = (now - this.startTime) / 1000;
+
+    this.multiplier = +(1 + 0.08 * Math.pow(elapsed, 1.8)).toFixed(2);
+
+    if (this.multiplier >= this.crashPoint) {
+      this.crash();
+      return;
+    }
+
+    document.getElementById('crashMultText').innerText = this.multiplier.toFixed(2) + 'x';
+    this.drawScene(this.multiplier);
+    this.animId = requestAnimationFrame(() => this.loop());
+  },
+
+  drawScene(mult) {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.state === 'running') {
+      const progress = Math.min(1, (mult - 1) / 8);
+      const startX = 30;
+      const startY = h - 30;
+      const endX = startX + (w - 70) * progress;
+      const endY = startY - (h - 60) * Math.min(1, Math.pow(progress, 0.7));
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(startX + (endX - startX) * 0.4, startY, endX, endY);
+      ctx.strokeStyle = "#00ff88";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(endX, endY);
+      ctx.font = "24px sans-serif";
+      ctx.fillText("🚀", -12, 6);
+      ctx.restore();
+    }
+  }
+};
+
+/* -------------------------------------------------------------------------
+   MINES GAME
+   ------------------------------------------------------------------------- */
+const MinesGame = {
+  minesCount: 3,
+  bet: 500,
+  board: [],
+  openedCount: 0,
+  isPlaying: false,
+
+  init() {
+    this.renderEmptyGrid();
+  },
+
+  renderEmptyGrid() {
+    const grid = document.getElementById('minesGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 25; i++) {
+      const tile = document.createElement('div');
+      tile.className = 'mine-tile disabled';
+      tile.innerHTML = '📟';
+      grid.appendChild(tile);
+    }
+  },
+
+  startGame() {
+    if (!requireAuth("играть в Мины")) return;
+    if (this.isPlaying) return;
+
+    const betVal = parseInt(document.getElementById('minesBetInput').value, 10);
+    if (isNaN(betVal) || betVal <= 0) return UI.toast("Укажите ставку!", "error");
+    if (State.balance < betVal) return UI.toast("Недостаточно монет для ставки!", "error");
+
+    State.balance -= betVal;
+    State.stats.coinsSpent += betVal;
+    saveState();
+
+    this.bet = betVal;
+    this.minesCount = parseInt(document.getElementById('minesCountSelect').value, 10);
+    this.openedCount = 0;
+    this.isPlaying = true;
+
+    this.board = Array(25).fill('gem');
+    let placedMines = 0;
+    while (placedMines < this.minesCount) {
+      const randIdx = Math.floor(Math.random() * 25);
+      if (this.board[randIdx] !== 'bomb') {
+        this.board[randIdx] = 'bomb';
+        placedMines++;
+      }
+    }
+
+    const btn = document.getElementById('minesActionBtn');
+    btn.innerText = "ЗАБРАТЬ БАНК";
+    btn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+
+    this.updateStatsPreview();
+
+    const grid = document.getElementById('minesGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 25; i++) {
+      const tile = document.createElement('div');
+      tile.className = 'mine-tile';
+      tile.innerHTML = '📟';
+      tile.onclick = () => this.clickTile(i, tile);
+      grid.appendChild(tile);
+    }
+  },
+
+  calcMultiplier(opened) {
+    if (opened === 0) return 1.0;
+    let mult = 1.0;
+    for (let i = 0; i < opened; i++) {
+      mult *= (25 - i) / (25 - this.minesCount - i);
+    }
+    return +(mult * 0.97).toFixed(2);
+  },
+
+  updateStatsPreview() {
+    const mult = this.calcMultiplier(this.openedCount);
+    document.getElementById('minesCurrentMult').innerText = mult.toFixed(2) + 'x';
+    document.getElementById('minesCurrentPayout').innerText = Math.round(this.bet * mult).toLocaleString() + ' 💰';
+  },
+
+  clickTile(idx, el) {
+    if (!this.isPlaying || el.classList.contains('opened')) return;
+
+    if (this.board[idx] === 'bomb') {
+      this.isPlaying = false;
+      el.classList.add('opened', 'bomb');
+      el.innerHTML = '💣';
+      SoundSystem.boom();
+      UI.toast("ВЗРЫВ! Вы попали на мину.", "error");
+      this.revealAll();
+
+      const btn = document.getElementById('minesActionBtn');
+      btn.innerText = "НАЧАТЬ ИГРУ";
+      btn.style.background = "";
+      return;
+    }
+
+    this.openedCount++;
+    el.classList.add('opened', 'gem');
+    el.innerHTML = '🔑';
+    SoundSystem.gem();
+    this.updateStatsPreview();
+
+    if (this.openedCount === 25 - this.minesCount) {
+      this.cashout();
+    }
+  },
+
+  cashout() {
+    if (!this.isPlaying || this.openedCount === 0) return;
+    this.isPlaying = false;
+
+    const mult = this.calcMultiplier(this.openedCount);
+    const winAmount = Math.round(this.bet * mult);
+
+    State.balance += winAmount;
+    saveState();
+    SoundSystem.win();
+    UI.toast(`ВЫИГРЫШ! +${winAmount.toLocaleString()} 💰 (${mult.toFixed(2)}x)`);
+
+    this.revealAll();
+
+    const btn = document.getElementById('minesActionBtn');
+    btn.innerText = "НАЧАТЬ ИГРУ";
+    btn.style.background = "";
+  },
+
+  revealAll() {
+    const tiles = document.querySelectorAll('.mine-tile');
+    tiles.forEach((tile, i) => {
+      tile.classList.add('disabled');
+      if (!tile.classList.contains('opened')) {
+        tile.classList.add('opened');
+        tile.innerHTML = (this.board[i] === 'bomb') ? '💣' : '🔑';
+      }
+    });
+  }
+};
+
+function adjustBet(inputId, factor) {
+  const inp = document.getElementById(inputId);
+  let val = parseInt(inp.value, 10) || 50;
+  val = Math.max(50, Math.round(val * factor));
+  inp.value = val;
+}
+
+function setBetMax(inputId) {
+  document.getElementById(inputId).value = State.balance;
+}
+
+/* -------------------------------------------------------------------------
+   UPGRADER
+   ------------------------------------------------------------------------- */
+function setUpgraderMode(mode) {
+  State.upgrader.mode = mode;
+  document.getElementById("tabModeClassic").classList.toggle("active", mode === "classic");
+  document.getElementById("tabModeBuff").classList.toggle("active", mode === "buff");
+
+  const buffRow = document.getElementById("buffMultipliersBox");
+  const targetHeader = document.getElementById("targetSlotHeader");
+
+  if (mode === "buff") {
+    targetHeader.innerText = "Результат баффа";
+    buffRow.style.display = "flex";
+    document.getElementById("selectTargetItemBtn").style.display = "none";
+  } else {
+    targetHeader.innerText = "Цель";
+    buffRow.style.display = "none";
+    document.getElementById("selectTargetItemBtn").style.display = "inline-flex";
+  }
+
+  updateUpgraderMath();
+}
+
+function updateUpgraderMath() {
+  const cur = State.upgrader.currentInvItem;
+  if (!cur) {
+    document.getElementById("upgradeChanceText").innerText = "0%";
+    document.getElementById("wheelSectorRing").style.background = "#1e293b";
+    document.getElementById("upgradeCostDiff").innerText = "0 💰 ➔ 0 💰";
+    document.getElementById("startUpgradeBtn").disabled = true;
+    return;
+  }
+
+  let ch = 0;
+  let targetPrice = 0;
+
+  if (State.upgrader.mode === "buff") {
+    const mult = State.upgrader.buffMultiplier;
+    targetPrice = Math.round(cur.price * mult);
+    ch = (1 / mult) * 88;
+    const cont = document.getElementById("targetSlotContent");
+    cont.innerHTML = `
+      <div class="item-card rarity-${cur.rarity.toLowerCase()}" style="margin:0;">
+        <span class="buff-badge-pill">x${mult} БАФФ</span>
+        <img src="${cur.image}" class="item-card-img" alt="">
+        <div class="item-card-name">${cur.name}</div>
+        <div class="item-card-price">${targetPrice.toLocaleString()} 💰</div>
+      </div>
+    `;
+  } else {
+    const tgt = State.upgrader.targetItem;
+    if (!tgt) {
+      document.getElementById("upgradeChanceText").innerText = "0%";
+      document.getElementById("wheelSectorRing").style.background = "#1e293b";
+      document.getElementById("upgradeCostDiff").innerText = "0 💰 ➔ 0 💰";
+      document.getElementById("startUpgradeBtn").disabled = true;
+      return;
+    }
+    targetPrice = tgt.price;
+    ch = (cur.price / tgt.price) * 100;
+    if (ch > 95) ch = 95;
+    const cont = document.getElementById("targetSlotContent");
+    cont.innerHTML = `
+      <div class="item-card rarity-${tgt.rarity.toLowerCase()}" style="margin:0;">
+        <img src="${tgt.image}" class="item-card-img" alt="">
+        <div class="item-card-name">${tgt.name}</div>
+        <div class="item-card-price">${tgt.price.toLocaleString()} 💰</div>
+      </div>
+    `;
+  }
+
+  ch = parseFloat(ch.toFixed(1));
+  State.upgrader.chance = ch;
+
+  document.getElementById("upgradeChanceText").innerText = `${ch}%`;
+  const deg = (ch / 100) * 360;
+  document.getElementById("wheelSectorRing").style.background = 
+    `conic-gradient(var(--accent-lime) 0deg, var(--accent-lime) ${deg}deg, #1e293b ${deg}deg 360deg)`;
+
+  document.getElementById("upgradeCostDiff").innerText = `${cur.price.toLocaleString()} 💰 ➔ ${targetPrice.toLocaleString()} 💰`;
+  document.getElementById("startUpgradeBtn").disabled = false;
+}
+
+function performUpgrade() {
+  if (!requireAuth("использовать апгрейдер")) return;
+  if (State.upgrader.isSpinning) return;
+  const cur = State.upgrader.currentInvItem;
+  if (!cur) return;
+
+  State.upgrader.isSpinning = true;
+  document.getElementById("startUpgradeBtn").disabled = true;
+
+  const ch = State.upgrader.chance;
+  const isWin = (Math.random() * 100) <= ch;
+  const sectorLimitDeg = (ch / 100) * 360;
+
+  let landingDegree = isWin 
+    ? 5 + Math.random() * Math.max(1, sectorLimitDeg - 10)
+    : sectorLimitDeg + 5 + Math.random() * Math.max(1, 355 - (sectorLimitDeg + 5));
+
+  const totalRotation = 2160 + landingDegree;
+  const arrowPivot = document.getElementById("wheelArrowPivot");
+
+  arrowPivot.style.transition = "none";
+  arrowPivot.style.transform = "rotate(0deg)";
+
+  setTimeout(() => {
+    SoundSystem.playTone(200, 'triangle', 4.0, 0.05);
+    arrowPivot.style.transition = "transform 4.5s cubic-bezier(0.1, 0.85, 0.25, 1)";
+    arrowPivot.style.transform = `rotate(${totalRotation}deg)`;
+
+    setTimeout(() => {
+      State.upgrader.isSpinning = false;
+      finishUpgrade(isWin, cur);
+    }, 4700);
+  }, 50);
+}
+
+function finishUpgrade(isWin, oldItem) {
+  const idx = State.inventory.findIndex(i => i.uid === oldItem.uid);
+  if (idx !== -1) State.inventory.splice(idx, 1);
+
+  if (isWin) {
+    SoundSystem.upgradeSuccess();
+    if (State.upgrader.mode === "buff") {
+      const mult = State.upgrader.buffMultiplier;
+      const buffed = {
+        ...oldItem,
+        uid: Date.now() + Math.random(),
+        price: Math.round(oldItem.price * mult),
+        isBuffed: true,
+        buffMult: mult
+      };
+      State.inventory.push(buffed);
+      UI.toast(`БАФФ УСПЕШЕН! Новая цена: ${buffed.price.toLocaleString()} 💰!`);
+    } else {
+      const tgt = State.upgrader.targetItem;
+      State.inventory.push({ ...tgt, uid: Date.now() + Math.random() });
+      UI.toast(`UPGRADE SUCCESS! Получен ${tgt.name}!`);
+    }
+    State.stats.upgradesWon++;
+  } else {
+    SoundSystem.upgradeFail();
+    UI.toast("АПГРЕЙД ПРОВАЛЕН! Предмет сгорел.", "error");
+  }
+
+  State.upgrader.currentInvItem = null;
+  State.upgrader.targetItem = null;
+  document.getElementById("currentSlotContent").innerHTML = `<div class="empty-slot-msg">Выберите предмет из инвентаря</div>`;
+  document.getElementById("targetSlotContent").innerHTML = `<div class="empty-slot-msg">Выберите цель или множитель</div>`;
+  updateUpgraderMath();
+  UI.renderInventory();
+  saveState();
+}
+
+/* -------------------------------------------------------------------------
+   HELPERS & PICKERS
+   ------------------------------------------------------------------------- */
+let selectedCaseForConfig = null;
+let selectedQuantity = 1;
+
+function openCaseConfig(caseId) {
+  if (!requireAuth("открывать кейсы")) return;
+
+  selectedCaseForConfig = CASES.find(c => c.id === caseId);
+  if (!selectedCaseForConfig) return;
+  selectedQuantity = 1;
+
+  document.getElementById("cfgCaseTitle").innerText = selectedCaseForConfig.name;
+  document.getElementById("cfgCaseDesc").innerText = selectedCaseForConfig.desc;
+  document.getElementById("cfgCaseImg").src = selectedCaseForConfig.image;
+
+  const qtyBlock = document.getElementById("cfgQtyBlock");
+  if (selectedCaseForConfig.isDaily) {
+    qtyBlock.style.display = "none";
+  } else {
+    qtyBlock.style.display = "block";
+    document.querySelectorAll(".btn-qty").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.qty === "1");
+    });
+  }
+
+  updateConfigCostDisplay();
+  UI.openModal("caseConfigModal");
+}
+
+function updateConfigCostDisplay() {
+  if (selectedCaseForConfig.isDaily) {
+    document.getElementById("cfgTotalCost").innerText = "0 (БЕСПЛАТНО)";
+  } else {
+    const cost = selectedCaseForConfig.price * selectedQuantity;
+    document.getElementById("cfgTotalCost").innerText = cost.toLocaleString();
+  }
+}
+
+function sellItem(uid) {
+  if (!requireAuth("продавать предметы")) return;
+
+  const idx = State.inventory.findIndex(i => i.uid === uid);
+  if (idx === -1) return;
+  const item = State.inventory[idx];
+
+  if (confirm(`Продать ${item.name} за ${item.price.toLocaleString()} 💰?`)) {
+    State.balance += item.price;
+    State.stats.itemsSold++;
+    State.inventory.splice(idx, 1);
+    UI.toast(`+${item.price.toLocaleString()} 💰 Предмет продан!`);
+    UI.renderInventory();
+    saveState();
+  }
+}
+
+function openInventoryPicker() {
+  if (!requireAuth("выбирать предметы для апгрейда")) return;
+  if (State.inventory.length === 0) return UI.toast("Ваш инвентарь пуст!", "error");
+
+  document.getElementById("itemPickerTitle").innerText = "Выберите домофон для улучшения";
+  const grid = document.getElementById("pickerItemsGrid");
+  grid.innerHTML = "";
+
+  State.inventory.forEach(itm => {
+    const el = document.createElement("div");
+    el.className = `item-card rarity-${itm.rarity.toLowerCase()}`;
+    el.innerHTML = `
+      <img src="${itm.image}" class="item-card-img" alt="">
+      <div class="item-card-name">${itm.name}</div>
+      <div class="item-card-price">${itm.price.toLocaleString()} 💰</div>
+    `;
+    el.onclick = () => {
+      State.upgrader.currentInvItem = itm;
+      document.getElementById("currentSlotContent").innerHTML = `
+        <div class="item-card rarity-${itm.rarity.toLowerCase()}" style="margin:0;">
+          <img src="${itm.image}" class="item-card-img" alt="">
+          <div class="item-card-name">${itm.name}</div>
+          <div class="item-card-price">${itm.price.toLocaleString()} 💰</div>
+        </div>
+      `;
+      updateUpgraderMath();
+      UI.closeModal("itemPickerModal");
+    };
+    grid.appendChild(el);
+  });
+
+  UI.openModal("itemPickerModal");
+}
+
+function openTargetPicker() {
+  if (!requireAuth("выбирать цель")) return;
+
+  const allowed = ITEMS.filter(i => !i.isLimited);
+  document.getElementById("itemPickerTitle").innerText = "Выберите желаемую цель";
+  const grid = document.getElementById("pickerItemsGrid");
+  grid.innerHTML = "";
+
+  allowed.forEach(itm => {
+    const el = document.createElement("div");
+    el.className = `item-card rarity-${itm.rarity.toLowerCase()}`;
+    el.innerHTML = `
+      <img src="${itm.image}" class="item-card-img" alt="">
+      <div class="item-card-name">${itm.name}</div>
+      <div class="item-card-price">${itm.price.toLocaleString()} 💰</div>
+    `;
+    el.onclick = () => {
+      State.upgrader.targetItem = itm;
+      updateUpgraderMath();
+      UI.closeModal("itemPickerModal");
+    };
+    grid.appendChild(el);
+  });
+
+  UI.openModal("itemPickerModal");
+}
+
+function refreshProfileUI() {
+  if (State.user && State.user.username) {
+    document.getElementById("profileLoggedInState").style.display = "block";
+    document.getElementById("profileLoggedOutState").style.display = "none";
+    document.getElementById("profileUsername").innerText = State.user.username;
+    document.getElementById("navUsername").innerText = State.user.username;
+
+    const av = State.user.avatar || "https://placehold.co/80x80/121720/00ff88?text=U";
+    document.getElementById("profileAvatarImg").src = av;
+    document.getElementById("navAvatar").src = av;
+    document.getElementById("navAvatar").style.display = "inline-block";
+
+    document.getElementById("profStatBal").innerText = State.balance.toLocaleString();
+    const worth = State.inventory.reduce((a, b) => a + (b.price * (b.buffMult || 1)), 0);
+    document.getElementById("profStatWorth").innerText = worth.toLocaleString();
+    document.getElementById("profStatCases").innerText = State.stats.casesOpened;
+  } else {
+    document.getElementById("profileLoggedInState").style.display = "none";
+    document.getElementById("profileLoggedOutState").style.display = "block";
+    document.getElementById("navUsername").innerText = "Войти";
+    document.getElementById("navAvatar").style.display = "none";
+  }
+}
+
+function addLiveDropFeed(item, username) {
+  const track = document.getElementById("liveFeedTrack");
+  const chip = document.createElement("div");
+  chip.className = `live-drop-chip rarity-${item.rarity.toLowerCase()}`;
+  chip.innerHTML = `
+    <img src="${item.image}" alt="">
+    <span><b>${username}</b>: <i>${item.name}</i></span>
+  `;
+  track.prepend(chip);
+  if (track.children.length > 15) track.removeChild(track.lastChild);
+}
+
+/* -------------------------------------------------------------------------
+   UI CONTROLLERS
+   ------------------------------------------------------------------------- */
+const UI = {
+  openModal(id) { document.getElementById(id).classList.add("active"); },
+  closeModal(id) { document.getElementById(id).classList.remove("active"); },
+  toast(msg, type = "normal") {
+    const cont = document.getElementById("toastContainer");
+    const t = document.createElement("div");
+    t.className = `toast ${type === 'error' ? 'error' : ''}`;
+    t.innerText = msg;
+    cont.appendChild(t);
+    setTimeout(() => t.remove(), 2800);
+  },
+  renderBalance() {
+    document.getElementById("userBalance").innerText = State.balance.toLocaleString();
+  },
+  renderCases() {
+    const cont = document.getElementById("casesContainer");
+    cont.innerHTML = "";
+
+    CASES.forEach(c => {
+      const card = document.createElement("div");
+      card.className = "case-card";
+
+      let oddsHtml = "";
+      if (c.isLegendaryOnly) {
+        oddsHtml = `<span class="odd-tag badge-legendary">Только Легендарки (Nexus 5%)</span>`;
+      } else if (c.odds) {
+        oddsHtml = c.odds.map(o => {
+          const it = ITEMS.find(i => i.id === o.itemId);
+          return `<span class="odd-tag badge-${it.rarity.toLowerCase()}">${it.name} (${o.chance}%)</span>`;
+        }).join("");
+      } else {
+        oddsHtml = `<span class="odd-tag">Все существующие домофоны</span>`;
+      }
+
+      const btnText = c.isDaily ? "ОТКРЫТЬ БЕСПЛАТНО" : `${c.price.toLocaleString()} 💰`;
+
+      card.innerHTML = `
+        <img src="${c.image}" onerror="this.onerror=null; this.src='https://placehold.co/160x160/121720/00ff88?text=Case'" class="case-card-img" alt="">
+        <div class="case-card-title">${c.name}</div>
+        <div class="case-card-desc">${c.desc}</div>
+        <div class="case-card-odds">${oddsHtml}</div>
+        <div class="case-card-btn-box">
+          <button class="btn btn-primary btn-block" onclick="openCaseConfig('${c.id}')">${btnText}</button>
+        </div>
+      `;
+      cont.appendChild(card);
+    });
+  },
+  renderInventory() {
+    const cont = document.getElementById("inventoryContainer");
+    cont.innerHTML = "";
+
+    const totalWorth = State.inventory.reduce((acc, itm) => acc + (itm.price * (itm.buffMult || 1)), 0);
+    document.getElementById("invCountDisplay").innerText = State.inventory.length;
+    document.getElementById("invSumDisplay").innerText = totalWorth.toLocaleString();
+
+    if (State.inventory.length === 0) {
+      cont.innerHTML = "<p style='color:var(--text-muted); grid-column:1/-1;'>Инвентарь пуст</p>";
+      return;
+    }
+
+    State.inventory.forEach(item => {
+      const card = document.createElement("div");
+      card.className = `item-card rarity-${item.rarity.toLowerCase()}`;
+      let buffTag = item.isBuffed ? `<span class="buff-badge-pill">x${item.buffMult || 2} БАФФ</span>` : "";
+
+      card.innerHTML = `
+        ${buffTag}
+        <img src="${item.image}" onerror="this.onerror=null; this.src='https://placehold.co/100x100/121720/00ff88?text=Domofon'" class="item-card-img" alt="">
+        <div class="item-card-name">${item.name}</div>
+        <span class="item-card-rarity badge-${item.rarity.toLowerCase()}">${item.rarity}</span>
+        <div class="item-card-price">${item.price.toLocaleString()} 💰</div>
+        <button class="btn btn-sm btn-outline btn-block" onclick="sellItem(${item.uid})">Продать</button>
+      `;
+      cont.appendChild(card);
+    });
+  }
+};
+
+/* -------------------------------------------------------------------------
+   INIT
+   ------------------------------------------------------------------------- */
+function init() {
+  loadState();
+
+  UI.renderBalance();
+  UI.renderCases();
+  UI.renderInventory();
+  refreshProfileUI();
+  checkDailyBonus();
+
+  CrashGame.init();
+  MinesGame.init();
+
+  loadLeaderboard();
+  loadTradesFromFirebase();
+  fetchLimitedPool();
+
+  document.getElementById("dailyRewardBtn").addEventListener("click", claimDailyBonus);
+  document.getElementById("coinClickerBtn").addEventListener("click", registerCoinClick);
+
+  document.getElementById("crashActionBtn").addEventListener("click", () => {
+    if (CrashGame.state === 'running') {
+      CrashGame.cashout();
+    } else {
+      CrashGame.start();
+    }
+  });
+
+  document.getElementById("minesActionBtn").addEventListener("click", () => {
+    if (MinesGame.isPlaying) {
+      MinesGame.cashout();
+    } else {
+      MinesGame.startGame();
+    }
+  });
+
+  document.querySelectorAll(".btn-qty").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".btn-qty").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedQuantity = parseInt(btn.dataset.qty, 10);
+      updateConfigCostDisplay();
+    });
+  });
+
+  document.getElementById("confirmOpenCaseBtn").addEventListener("click", () => {
+    if (selectedCaseForConfig) {
+      UI.closeModal("caseConfigModal");
+      startCaseOpening(selectedCaseForConfig, selectedQuantity);
+    }
+  });
+
+  document.getElementById("claimAllRewardsBtn").addEventListener("click", () => {
+    State.activeOpening.pendingRewards.forEach(itm => {
+      State.inventory.push({ ...itm, uid: Date.now() + Math.random() });
+      State.stats.itemsWon++;
+    });
+    saveState();
+    UI.renderInventory();
+    UI.closeModal("rouletteModal");
+    UI.toast("Предметы добавлены в инвентарь!");
+  });
+
+  document.getElementById("selectInvItemBtn").addEventListener("click", openInventoryPicker);
+  document.getElementById("selectTargetItemBtn").addEventListener("click", openTargetPicker);
+  document.getElementById("startUpgradeBtn").addEventListener("click", performUpgrade);
+
+  document.querySelectorAll(".btn-buff-mult").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".btn-buff-mult").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      State.upgrader.buffMultiplier = parseFloat(btn.dataset.mult);
+      updateUpgraderMath();
+    });
+  });
+
+  document.getElementById("createTradeOfferBtn").addEventListener("click", openCreateTradeModal);
+  document.getElementById("submitCreateTradeBtn").addEventListener("click", submitCreateTrade);
+
+  document.getElementById("openProfileBtn").addEventListener("click", () => {
+    refreshProfileUI();
+    UI.openModal("profileModal");
+  });
+
+  document.getElementById("loginSubmitBtn").addEventListener("click", () => {
+    const l = document.getElementById("authLoginInput").value;
+    const p = document.getElementById("authPassInput").value;
+    authLogin(l, p);
+  });
+
+  document.getElementById("registerSubmitBtn").addEventListener("click", () => {
+    const l = document.getElementById("authLoginInput").value;
+    const p = document.getElementById("authPassInput").value;
+    authRegister(l, p);
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    State.user = null;
+    saveState();
+    refreshProfileUI();
+    UI.closeModal("profileModal");
+    UI.toast("Вы вышли из аккаунта");
+  });
+
+  document.getElementById("avatarFileInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(evt) {
+      if (State.user) {
+        State.user.avatar = evt.target.result;
+        saveState();
+        refreshProfileUI();
+        UI.toast("Аватарка обновлена!");
+
+        const clean = encodeURIComponent(State.user.username);
+        try {
+          await fetch(`${FIREBASE_URL}users/${clean}/avatar.json`, {
+            method: "PUT",
+            body: JSON.stringify(State.user.avatar)
+          });
+        } catch(err) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("resetDataBtn").addEventListener("click", () => {
+    if (confirm("Сбросить локальную сессию? Вы выйдете из аккаунта.")) {
+      localStorage.removeItem("domofon_drop_session_v4");
+      location.reload();
+    }
+  });
+
+  // Нижний мобильный бар: подсветка активного раздела
+  document.querySelectorAll(".m-nav-item").forEach(item => {
+    item.addEventListener("click", function() {
+      document.querySelectorAll(".m-nav-item").forEach(i => i.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+
+  window.addEventListener("click", () => SoundSystem.init(), { once: true });
+}
+
+document.addEventListener("DOMContentLoaded", init);
