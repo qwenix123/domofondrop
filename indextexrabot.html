@@ -346,29 +346,29 @@
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
-      Плановые работы: 5 минут
+      Плановые работы: 5 часов
     </div>
 
-    <h1 class="main-title">ГОТОВИМ ОБНОВЛЕНИЕ <span>BETA 0.2</span></h1>
+    <h1 class="main-title">ГОТОВИМ ОБНОВЛЕНИЕ <span>Release 0.3</span></h1>
     <p class="main-desc">
-      Накатываем свежие патчи, оптимизируем базу данных и обновляем функционал системы. Серверы кратковременно недоступны.
+      Накатываем новые кейсы и делаем новую OG редкость. Фиксим баги.
     </p>
 
     <div class="maint-card">
       <div class="timer-grid">
         <div class="timer-cell">
-          <div class="timer-num" id="timerMinutes">02</div>
-          <div class="timer-label">Минут</div>
+          <div class="timer-num" id="timerMinutes">5</div>
+          <div class="timer-label">Часов</div>
         </div>
         <div class="timer-cell">
           <div class="timer-num" id="timerSeconds">59</div>
-          <div class="timer-label">Секунд</div>
+          <div class="timer-label">Минут</div>
         </div>
       </div>
 
       <div class="progress-info">
-        <span>Статус: Применение миграций БД</span>
-        <span id="pctVal">40%</span>
+        <span>Статус: фиксинг Style.css</span>
+        <span id="pctVal">10%</span>
       </div>
       <div class="progress-track">
         <div class="progress-fill" id="progressFill"></div>
@@ -407,9 +407,9 @@
   </footer>
 
   <script>
-    // Запуск таймера: 3 минуты (180 секунд) до старта сервера из общего 5-минутного окна
-    const TOTAL_MAINTENANCE_SEC = 300; 
-    let remainingSeconds = 180; 
+
+    const TOTAL_MAINTENANCE_SEC = 3000; 
+    let remainingSeconds = 1800; 
 
     const minEl = document.getElementById('timerMinutes');
     const secEl = document.getElementById('timerSeconds');
