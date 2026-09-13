@@ -18,6 +18,7 @@
   --rarity-epic: #9333ea;
   --rarity-legendary: #eab308;
   --rarity-limited: #ec4899;
+  --rarity-door: #ffb703;
   --rarity-og: #00f2fe;
 
   --radius-sm: 8px;
@@ -42,7 +43,7 @@ body.dark-theme {
   padding-bottom: 95px;
 }
 
-h1, h2, h3, h4, .brand-name, .balance-badge, .stat-val, .badge-pill, .btn-qty {
+h1, h2, h3, h4, .brand-name, .balance-badge, .stat-val, .badge-pill, .btn-qty, .timer-countdown {
   font-family: 'Space Grotesk', sans-serif;
 }
 
@@ -174,6 +175,11 @@ img {
   font-size: 13px;
   color: #fbbf24;
 }
+.door-coins-badge {
+  color: #ffb703;
+  border-color: rgba(255, 183, 3, 0.3);
+  background: rgba(255, 183, 3, 0.06);
+}
 .btn-profile {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -215,21 +221,21 @@ img {
   box-shadow: 0 0 12px var(--accent-lime-glow);
 }
 
-/* МОБИЛЬНЫЙ БАР (8 КНОПОК БЕЗ ПОЛОМОК) */
+/* МОБИЛЬНЫЙ БАР — 8 КНОПОК БЕЗ СКРОЛЛА */
 .mobile-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 68px;
+  height: 64px;
   background: rgba(9, 12, 16, 0.98);
   border-top: 1px solid var(--border-color);
   backdrop-filter: blur(16px);
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  display: flex;
+  justify-content: space-around;
   align-items: center;
   z-index: 999;
-  padding: 0 4px env(safe-area-inset-bottom);
+  padding: 0 2px env(safe-area-inset-bottom);
 }
 .m-nav-item {
   display: flex;
@@ -239,25 +245,27 @@ img {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   height: 100%;
   cursor: pointer;
   transition: var(--transition);
-  gap: 3px;
-  padding: 2px;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 1px;
 }
-.m-nav-item svg { width: 17px; height: 17px; }
+.m-nav-item svg { width: 16px; height: 16px; }
 .m-nav-item.active { color: var(--accent-lime); }
+.m-nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-/* Выделенная центральная кнопка Лидерборда */
 .m-nav-center-highlight {
   color: #fbbf24 !important;
-  transform: translateY(-4px);
+  transform: translateY(-3px);
 }
 .m-nav-center-highlight svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6));
 }
 
@@ -275,7 +283,7 @@ img {
 .section-title-box p { color: var(--text-muted); font-size: 13px; }
 .flex-between { display: flex; justify-content: space-between; align-items: flex-end; }
 
-/* DAILY BANNER & PROMO BAR */
+/* DAILY BANNER */
 .daily-bar-container { margin-bottom: 14px; }
 .btn-daily-banner {
   width: 100%;
@@ -293,12 +301,6 @@ img {
   gap: 8px;
 }
 .btn-daily-banner:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; }
-
-.promo-box-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
 
 /* BUTTONS */
 .btn {
@@ -324,6 +326,239 @@ img {
 .btn-block { width: 100%; }
 .btn-danger-ghost { background: transparent; color: var(--danger); border: 1px solid #7f1d1d; }
 .flex-1 { flex: 1; }
+
+/* КЛИКЕР НА ГЛАВНОЙ */
+.main-clicker-wrapper {
+  margin-top: 36px;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+/* DOOR EVENT СТИЛИ */
+.door-event-section {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 1px dashed #243144;
+}
+.door-event-banner {
+  background: radial-gradient(circle at 80% 20%, rgba(255, 183, 3, 0.12), transparent 50%), var(--bg-card);
+  border: 1px solid #2d3b4f;
+  border-radius: var(--radius-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.door-badge-glow {
+  display: inline-block;
+  background: rgba(255, 183, 3, 0.15);
+  color: #ffb703;
+  border: 1px solid #ffb703;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.door-event-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.door-event-header p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.season-notice-banner {
+  background: rgba(255, 183, 3, 0.08);
+  border: 1px solid rgba(255, 183, 3, 0.3);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: #ffc233;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.season-timer-card {
+  background: var(--bg-slot);
+  border: 1px solid #233044;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: flex-start;
+}
+.timer-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+.timer-countdown {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffb703;
+  letter-spacing: 1px;
+}
+
+.door-event-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.door-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+.panel-head h3 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.panel-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 16px;
+}
+.quest-refresh-timer {
+  font-size: 11px;
+  color: #ffb703;
+  font-weight: 600;
+}
+
+.quests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.quest-card {
+  background: var(--bg-slot);
+  border: 1px solid var(--border-color);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: var(--transition);
+}
+.quest-card:hover { border-color: #2b394f; }
+.quest-info-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.quest-info-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.quest-reward-tag {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffb703;
+  white-space: nowrap;
+}
+
+.door-shop-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+.door-shop-card {
+  background: var(--bg-slot);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.door-shop-card img {
+  width: 70px;
+  height: 70px;
+  margin-bottom: 8px;
+  object-fit: contain;
+}
+.door-shop-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.door-shop-price {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffb703;
+  margin-bottom: 10px;
+}
+
+/* ВКЛАДКИ ИНВЕНТАРЯ */
+.inv-type-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.inv-tab-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.inv-tab-btn.active {
+  background: var(--accent-lime);
+  color: #032110;
+  border-color: var(--accent-lime);
+}
+
+/* ФИЛЬТРЫ ЛИДЕРБОРДА */
+.leaderboard-filter-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.leaderboard-filter-tabs::-webkit-scrollbar { display: none; }
+.lb-filter-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.lb-filter-btn.active {
+  background: #fbbf24;
+  color: #000;
+  border-color: #fbbf24;
+  font-weight: 700;
+}
 
 /* КАРТОЧКИ КЕЙСОВ */
 .cases-grid {
@@ -358,7 +593,7 @@ img {
 .odd-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #0f141f; }
 .case-card-btn-box { width: 100%; margin-top: auto; }
 
-/* ЗАКРЕПЛЕНИЕ ПРЕДМЕТА (ВИТРИНА В ПРОФИЛЕ) */
+/* ЗАКРЕПЛЕНИЕ ПРЕДМЕТА */
 .item-card.pinned-item {
   border: 2px solid #ffd700 !important;
   box-shadow: 0 0 16px rgba(255, 215, 0, 0.4), inset 0 0 12px rgba(255, 215, 0, 0.15) !important;
@@ -381,9 +616,7 @@ img {
 .rarity-rare { border-color: var(--rarity-rare) !important; }
 .rarity-epic { border-color: var(--rarity-epic) !important; }
 .rarity-legendary { border-color: var(--rarity-legendary) !important; }
-.rarity-limited { border-color: var(--rarity-limited) !important; }
-
-/* OG ПЕРЕЛИВАНИЕ */
+.rarity-door { border-color: var(--rarity-door) !important; }
 .rarity-og {
   border: 2px solid transparent !important;
   background: 
@@ -393,25 +626,16 @@ img {
   box-shadow: 0 0 25px rgba(0, 242, 254, 0.5) !important;
   animation: ogGlowShift 3s ease infinite !important;
 }
-.rarity-og .item-card-name {
-  background: linear-gradient(90deg, #00f2fe, #4facfe, #ec4899, #00f2fe);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: textShine 2s linear infinite;
-  font-weight: 800;
-}
 
 .badge-common { background: rgba(107, 114, 128, 0.2); color: #cbd5e1; }
 .badge-rare { background: rgba(2, 132, 199, 0.2); color: #38bdf8; }
 .badge-epic { background: rgba(147, 51, 234, 0.2); color: #c084fc; }
 .badge-legendary { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-.badge-limited { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+.badge-door { background: rgba(255, 183, 3, 0.2); color: #ffb703; }
 .badge-og {
   background: linear-gradient(135deg, #00f2fe, #4facfe);
   color: #000;
   font-weight: 800;
-  box-shadow: 0 0 10px #00f2fe;
 }
 
 /* MUTATIONS */
@@ -426,13 +650,9 @@ img {
   text-transform: uppercase;
   z-index: 5;
 }
-.mutation-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; box-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
-.mutation-diamond { background: linear-gradient(135deg, #06b6d4, #0284c7); color: #000; box-shadow: 0 0 8px rgba(6, 182, 212, 0.6); }
-.mutation-rainbow { background: var(--accent-rainbow); background-size: 200% 200%; color: #fff; animation: rainbowShift 2s linear infinite; }
-
-.item-card.mutated-gold { border-color: #f59e0b !important; box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.25) !important; }
-.item-card.mutated-diamond { border-color: #06b6d4 !important; box-shadow: inset 0 0 12px rgba(6, 182, 212, 0.25) !important; }
-.item-card.mutated-rainbow { border-color: #ec4899 !important; box-shadow: inset 0 0 16px rgba(236, 72, 153, 0.3) !important; }
+.mutation-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; }
+.mutation-diamond { background: linear-gradient(135deg, #06b6d4, #0284c7); color: #000; }
+.mutation-rainbow { background: var(--accent-rainbow); color: #fff; animation: rainbowShift 2s linear infinite; }
 
 /* ИНВЕНТАРЬ */
 .inventory-grid, .picker-grid {
@@ -481,7 +701,7 @@ img {
 .cfg-total-cost { font-size: 15px; font-weight: 800; margin-bottom: 14px; text-align: center; }
 .cfg-total-cost span { color: #fbbf24; }
 
-/* ИГРЫ И UPGRADER (TOUCH-FIX ДЛЯ МОБИЛОК) */
+/* ИГРЫ И UPGRADER */
 .game-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; }
 .control-row { display: flex; gap: 8px; width: 100%; }
 .control-group label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
@@ -546,8 +766,8 @@ img {
 .clicker-arena { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 30px; display: flex; align-items: center; justify-content: center; }
 .domofon-button-big { width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, #1a2432, #0b0f16); border: 4px solid var(--accent-lime); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--accent-lime); box-shadow: 0 0 25px var(--accent-lime-glow); }
 .domofon-button-big:active { transform: scale(0.92); }
-.domofon-btn-txt { font-size: 12px; font-weight: 800; margin-top: 6px; }
-.float-coin-text { position: absolute; color: #fbbf24; font-weight: 800; font-size: 18px; pointer-events: none; animation: floatUp 0.8s forwards ease-out; }
+.domofon-btn-txt { font-size: 11px; font-weight: 800; margin-top: 6px; text-align: center; }
+.float-coin-text { position: absolute; color: #fbbf24; font-weight: 800; font-size: 17px; pointer-events: none; animation: floatUp 0.8s forwards ease-out; }
 
 /* LEADERBOARD TABLE */
 .table-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-x: auto; }
@@ -613,6 +833,7 @@ img {
 
 @media (max-width: 768px) {
   .banking-grid { grid-template-columns: 1fr; }
+  .door-event-grid { grid-template-columns: 1fr; }
   .upgrader-panel { display: flex; flex-direction: column; }
   .mines-box { display: flex; flex-direction: column; }
   .tabs-nav-bar { display: none; }
@@ -621,4 +842,4 @@ img {
 @media (min-width: 769px) {
   .mobile-bottom-nav { display: none; }
   body.dark-theme { padding-bottom: 20px; }
-}
+} 
